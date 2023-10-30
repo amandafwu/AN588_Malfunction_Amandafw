@@ -2,56 +2,199 @@
 title: "Amandafw_OriginalHomeworkCode_04"
 author: "Amanda Wu"
 date: "2023-10-23"
-output: html_document
+output: 
+  rmarkdown::html_document:
+    theme: cosmo
 ---
 
 
-## Question 1: Write a simple R function, Z.prop.test(), that can perform one- or two-sample Z-tests for proportion data, using the following guidelines:
-  + Your function should take the following arguments: p1 and n1 (no default) representing the estimated proportion and sample size (i.e., based on your sample data); p2 and n2 (both defaulting to NULL) that contain a second sample’s proportion and sample size data in the event of a two-sample test; p0 (no default) as the expected value for the population proportion; and alternative (default “two.sided”) and conf.level (default 0.95), to be used in the same way as in the function t.test().
-  
-  + When conducting a two-sample test, it should be p1 that is tested as being smaller or larger than p2 when alternative=“less” or alternative=“greater”, the same as in the use of x and y in the function t.test().
-  
-  + The function should perform a one-sample Z-test using p1, n1, and p0 if either p2 or n2 (or both) is NULL.
-  
-  + The function should contain a check for the rules of thumb we have talked about (n∗p>5 and n∗(1−p)>5) to ensure the validity of assuming the normal distribution in both the one- and two-sample settings. If this is violated, the function should still complete but it should also print an appropriate warning message.
-  
-  + The function should return a list containing the members Z (the test statistic), P (the appropriate p value), and CI (the two-sided CI with respect to “conf.level” around p1 in the case of a one-sample test and around p2-p1 in the case of a two-sample test). For all test alternatives (“two.sided”, “greater”, “less”), calculate symmetric CIs based on quantiles of the normal distribution rather than worrying about calculating single-limit confidence bounds.
-  
-```{r Question 1}
+## Question 1
+
+```{r Question 1 z.test}
 # p1 = probabilities of success / estimated proportions of sample 1 
 # n1 = count of trails / sample size of sample 1
 # x = sample of the data set 
-p1 <- .6 #random 
-n1 <- 50 #random
-p2 <- NULL #to perform a one-sample prop test
-n2 <- NULL #to perform a one-sample prop test
-p0 <- .8 #random
-one.sample.prop.test<- prop.test(x = c(p1, p2), n = c(n1, n2), p = p0, alternative = c("two.sided", "less", "greater"), conf.level = 0.95, correct = T ) 
-  if (n1 * p1 <= 5 || n1 * (1 - p1) <= 5) {
-    print("Warning! Normal Distribution should not be assumed")
-  }
-one.sample.prop.test 
+library(BSDA)
+set.seed(1)
+p1 <- 24
+p2 <- 35
+n1 <- 50
+n2 <- 80
+dataset <- rnorm(n1, mean = p1, sd = 5) # making the data set
+dataset2 <- rnorm(n2, mean = p2, sd = 7) # second data set
 
-p1 <- .6 #random 
-n1 <- 50 #random
-p2 <- .9 #random
-n2 <- 80 #random
-p0 <- NULL #tried to keep the same value as .8 but error said "'p' must have the same length as 'x' and 'n'" 
-two.sample.prop.test<- prop.test(x = c(p1, p2), n = c(n1, n2), p = p0, alternative = c("two.sided", "less", "greater"), conf.level = 0.95, correct = T ) 
-  if (n1 * p1 <= 5 || n1 * (1 - p1) <= 5) {
+z.prop.test <- function (p1, p2 = NULL, n1, n2 = NULL, alternative = "two.sided", p0, conf.level = 0.95)  # function was written from the information in the instructions and entering z.test on console
+{
+    choices <- c("two.sided", "greater", "less")
+    alt <- pmatch(alternative, choices)
+    alternative <- choices[alt] # don't really understand why this is here but it was shown when you enter z.test on console
+
+    if (!is.null(n1)) {
+        if (n1 * p1 <= 5 || n1 * (1 - p1) <= 5) { # one sample test
+          print("Warning! Normal Distribution should not be assumed")
+           }
+        } else {
+           if (n2 * p2 <= 5 || n2 * (1 - p2) <= 5) { # two sample test
     print("Warning! Normal Distribution should not be assumed")
-  }
-  if (n2 * p2 <= 5 || n2 * (1 - p2) <= 5) {
-    print("Warning! Normal Distribution should not be assumed")
-  }
-two.sample.prop.test
+           }
+        }
+    
+    p1ok <- !is.na(p1) # checking the length of x without na 
+    p1 <- p1[p1ok] #code was included in the z.test function
+    np1 <- length(p1)
+    mp1 <- mean(p1) #calculating mean of p1
+    estimate <- mp1
+    if (is.null(n1)) {
+        stderr <- sigma.x/sqrt(np1) # this is calculating sem
+        zobs <- (mp1 - n0)/stderr # this is calculating z
+        method <- c("One-sample z-Test") # output
+        names(estimate) <- c("mean of p1") # output
+    }
+    else {
+        p2ok <- !is.na(p2) # same as above
+        p2 <- p2[p2ok]
+        np2 <- length(p2)
+        mp2 <- mean(p2)
+        method <- c("Two-sample z-Test")
+        estimate <- c(mp1, mp2)
+        names(estimate) <- c("mean of p1", "mean of p2")
+        stderr <- sqrt(((sigma.x^2)/np1) + ((sigma.y^2)/np2))
+        zobs <- (mp1 - mp2 - n0)/stderr
+    }
+    if (alternative == "less") { 
+        pval <- pnorm(zobs)
+        cint <- c(NA, zobs * stderr + qnorm(conf.level) * stderr) 
+    }
+    else if (alternative == "greater") {
+        pval <- 1 - pnorm(zobs)
+        cint <- c(zobs * stderr - qnorm(conf.level) * stderr, 
+            NA)
+    }
+    else {
+        pval <- 2 * pnorm(-abs(zobs))
+        alpha <- 1 - conf.level
+        cint <- c(zobs * stderr - qnorm((1 - alpha/2)) * stderr, 
+            zobs * stderr + qnorm((1 - alpha/2)) * stderr)
+    }
+    cint <- cint + mu
+    names(zobs) <- "z"
+    if (!is.null(p2)) 
+        names(n0) <- "difference in means"
+    else names(n0) <- "mean"
+    attr(cint, "conf.level") <- conf.level
+    rval <- list(statistic = zobs, p.value = pval, conf.int = cint, 
+        estimate = estimate, null.value = mu, alternative = alternative, 
+        method = method, data.name = dname)
+    attr(rval, "class") <- "htest"
+    return(rval)
+}
+
+```
+I adapted the function z.test to include the variables listed for proportional data. Unsure if this is the function that I should be using because I don't know how you can add p1, n1, etc to the function, not sure if it's just because i'm stupid .. 
+  + also, not sure why my two-sample z test is negative ?! 
+
+    
+## Question 2
+    
+```{r Question 2 Making Scatterplot for MaxLong ~ BrainSize}
+library(curl)
+library(ggplot2)
+library(tidyverse)
+
+f <- curl("https://raw.githubusercontent.com/fuzzyatelin/fuzzyatelin.github.io/master/AN588_Fall23/KamilarAndCooperData.csv") #pulling the data into R
+d <- read.csv(f, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+head(d)
+# Fit the regression model and, using {ggplot2}, produce a scatterplot with the fitted line superimposed upon the data. Append the the fitted model equation to your plot (HINT: use the function geom_text()).
+p <- ggplot(d = d, aes(x = MaxLongevity_m, y = Brain_Size_Species_Mean))
+p <- p + xlab("Longevity") + ylab("Brain Size")  #renaming the axis
+p <- p + geom_point()  #make a scatterplot
+p <- p + geom_smooth(method = "lm", level = .95, color = "red") #adding regression lines
+p <- p + annotate("text", x = 250, y = 750, label = "y = 1.218x + 248.952") #using annotate after Lily told me about the function since geom_text didn't work 
+p
+lm(d$MaxLongevity_m ~ d$Brain_Size_Species_Mean) # gave me the fitted model equation 
+
+# log(longevity) & log(brain size) scatterplot
+Longevity <- log(d$MaxLongevity_m)
+Brainsize <- log(d$Brain_Size_Species_Mean)
+p <- ggplot(d = d, aes(x = Longevity, y = Brainsize))
+p <- p + xlab("log(Longevity)") + ylab("log(Brain Size)")  #renaming the axis
+p <- p + geom_point()  #make a scatterplot
+p <- p + geom_smooth(method = "lm", level = .95, color = "red") #adding regression lines
+p <- p + annotate("text", x = 5, y = 6, label = "y = 0.2341x + 4.8790") 
+p
+lm(data = d, log(MaxLongevity_m) ~ log(Brain_Size_Species_Mean)) # gave me the fitted model equation 
 ```
 
 
-## Question 2
-  + The dataset from Kamilar and Cooper has in it a large number of variables related to life history and body size. For this exercise, the end aim is to fit a simple linear regression model to predict longevity (MaxLongevity_m) measured in months from species’ brain size (Brain_Size_Species_Mean) measured in grams. Do the following for both longevity~brain size and log(longevity)~log(brain size):
-    + Fit the regression model and, using {ggplot2}, produce a scatterplot with the fitted line superimposed upon the data. Append the the fitted model equation to your plot (HINT: use the function geom_text()).
-    + Identify and interpret the point estimate of the slope (β1), as well as the outcome of the test associated with the hypotheses H0: β1 = 0; HA: β1 ≠ 0. Also, find a 90 percent CI for the slope (β1) parameter.
-    + Using your model, add lines for the 90 percent confidence and prediction interval bands on the plot and add a legend to differentiate between the lines.
-    + Produce a point estimate and associated 90 percent PI for the longevity of a species whose brain weight is 800 gm. Do you trust the model to predict observations accurately for this value of the explanatory variable? Why or why not?
-    + Looking at your two models, which do you think is better? Why?
+```{r Calculating Point Estimate and CI}
+# Identify and interpret the point estimate of the slope (β1), as well as the outcome of the test associated with the hypotheses H0: β1 = 0; HA: β1 ≠ 0. Also, find a 90 percent CI for the slope (β1) parameter.
+Model <- lm(data = d, MaxLongevity_m ~ Brain_Size_Species_Mean)
+PE <- predict(Model, newdata = data.frame(Brain_Size_Species_Mean = 1.218), interval = "prediction", level = 0.90)
+head(PE,1) #this doesn't seem like the correct value
+confint(Model, level = 0.90) #finding CI
+
+# for log version
+
+Model <- lm(data = d, log(MaxLongevity_m) ~ log(Brain_Size_Species_Mean))
+PE <- predict(Model, newdata = data.frame(Brain_Size_Species_Mean = 0.2341), interval = "prediction", level = 0.90)
+head(PE,1) # this value looks alot better than one above
+confint(Model, level = 0.90) 
+```
+The point estimate of the slope (β1) is the expected change in units of y for every 1 unit of change in x while β0 is the predicted value of y when the value of x is zero.
+Source: https://rstudio-pubs-static.s3.amazonaws.com/364807_2a19c487ae5e433eb22f61b641b9b12c.html#section_32:_the_least_squares_point_estimates 
+
+```{r Adding CI and prediction lines into plot}
+# Using your model, add lines for the 90 percent confidence and prediction interval bands on the plot and add a legend to differentiate between the lines.
+v <-  seq(from = 1.63, to = 491.27, by = 5) #taken from using summary(m) ?
+m <- lm(data = d, MaxLongevity_m ~ Brain_Size_Species_Mean)
+ci <- predict(m, newdata = data.frame(Brain_Size_Species_Mean = v), interval = "confidence", level = 0.95) #straight from mod 12 
+pi <- predict(m, newdata = data.frame(Brain_Size_Species_Mean = v), interval = "prediction", level = 0.95) 
+plot(data = d, MaxLongevity_m ~ Brain_Size_Species_Mean)
+lines(x = v, y = ci[, 1], col = "black") #straight from mod 12 
+lines(x = v, y = ci[, 2], col = "blue")
+lines(x = v, y = ci[, 3], col = "blue")
+lines(x = v, y = pi[, 2], col = "red")
+lines(x = v, y = pi[, 3], col = "red")
+legend(300, 300, legend=c("Line of Best Fit", "Confidence", "Prediction"), fill = c("black", "blue","red")) 
+
+# log version
+v <-  seq(from = 0, to = 7, by = .05)
+Longevity <- log(d$MaxLongevity_m)
+Brainsize <- log (d$Brain_Size_Species_Mean)
+m <- lm(Longevity ~ Brainsize)
+ci <- predict(m, newdata = data.frame(Brainsize = v), interval = "confidence", level = 0.95)
+pi <- predict(m, newdata = data.frame(Brainsize = v), interval = "prediction", level = 0.95)
+plot(data = d, log(MaxLongevity_m) ~ log(Brain_Size_Species_Mean))
+lines(x = v, y = ci[, 1], col = "black")
+lines(x = v, y = ci[, 2], col = "blue")
+lines(x = v, y = ci[, 3], col = "blue")
+lines(x = v, y = pi[, 2], col = "red")
+lines(x = v, y = pi[, 3], col = "red")
+legend(4.5, 5.25, legend=c("Line of Best Fit", "Confidence", "Prediction"), fill = c("black", "blue","red"))
+```
+Source: https://www.geeksforgeeks.org/add-legend-to-plot-in-r/ (for the legend); code was taken almost completely from module 12
+Notes: this is a pretty ugly graph .. it took me so long to do because I kept running into the error "Error in xy.coords(x, y) : 'x' and 'y' lengths differ" when I tried to do Longevity as X and Brain Size as Y
+The logged version looks way better !
+
+
+```{r 800 gm}
+# Produce a point estimate and associated 90 percent PI for the longevity of a species whose brain weight is 800 gm. Do you trust the model to predict observations accurately for this value of the explanatory variable? Why or why not?
+
+Model <- lm(d$MaxLongevity_m ~ d$Brain_Size_Species_Mean)
+species <- predict(Model, newdata = data.frame(MaxLongevity_m = 800), interval = "prediction", level = 0.90)
+head(species,1)
+
+Model <- lm(data = d, Longevity ~ Brainsize)
+logspecies <- predict(Model, newdata = data.frame(Brainsize = 800, interval = "prediction", level = 0.90))
+head(logspecies, 1) # this value looks alot better than one above
+```
+I'm not sure if it's my function, but the CI is extremely wide which wouldn't be reliable. The log version appears to be better
+
+### Conclusion: Looking at the two models, the log version definitely looks better as their values are smaller and appear more concise. I had some difficulties calculating the log values though as it wouldn't always work with the same functions as normal. 
+
+
+
+
+
+
+
